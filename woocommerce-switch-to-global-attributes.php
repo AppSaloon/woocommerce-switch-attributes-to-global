@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Appsaloon Processor
+Plugin Name: Appsaloon Woocommerce switch attributes to global
 Plugin URI: https://appsaloon.be
 Description: Show WooCommerce variable products variations as table with filters and sorting instead of normal dropdowns.
 Author: AppSaloon

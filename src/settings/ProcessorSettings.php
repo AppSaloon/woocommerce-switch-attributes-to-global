@@ -14,7 +14,7 @@ class ProcessorSettings {
 				'manage_options',
 				'transform_wc_attributes',
 				array( $this, 'transform_page_html' ),
-				'' );
+				10 );
 
 
 			add_action( 'load-' . $progress_page, array( $this, 'enqueue_scripts' ) );
