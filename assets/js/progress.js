@@ -1,45 +1,53 @@
 const elMessage = document.getElementById( 'message' );
 const elProgress = document.getElementById( 'progress_bar' );
 const elBtnProgress = document.getElementById( 'btn_start_process' );
+const elPercentageCompleted = document.getElementById( 'percentage_completed' );
+const elAmountCompleted = document.getElementById( 'amount_completed' );
+const maxProducts = elProgress.max;
 
 function startProcess() {
     const action = ap_progress.action;
-    const offset = elProgress.value;
-    const max = elProgress.max;
+    const promises = [];
+    for ( let i = 0; i < maxProducts; i++ ) {
+        const promise = new Promise( function ( resolve ) {
+            const opts = 'action=' + action + '&offset=' + i + '&max=' + maxProducts;
+            checkProduct( opts ).then( resolve );
+        } )
+        promises.push( promise )
+    }
 
-    const opts = 'action=' + action + '&offset=' + offset + '&max=' + max;
+    elBtnProgress.innerHTML = 'IN PROGRESS';
+    elBtnProgress.disabled = true;
 
-    checkProduct( opts, elProgress, elMessage );
+    Promise.all( promises ).then(
+        function () {
+            console.log( 'David' )
+            elMessage.innerText += 'The process is complete';
+            elBtnProgress.innerHTML = 'Start script';
+            elBtnProgress.disabled = false;
+        }
+    );
 }
 
-function checkProduct( opts, elProgress, elMessage ) {
-    fetch( ajaxurl, {
+async function checkProduct( opts ) {
+    const response = await fetch( ajaxurl, {
         method: 'post',
         credentials: 'same-origin',
         body: opts,
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
         }
-    } ).then( function ( response ) {
-        return response.json();
-    } ).then( function ( data ) {
-        if ( data.error === true ) {
-            elMessage.innerText = 'ERROR: ' + data.errorMessage;
-            elBtnProgress.innerHTML = 'ERROR';
-            elBtnProgress.disabled = true;
-            return
-        }
-
-        elProgress.value = data.value;
-
-        elProgress.setAttribute( 'data-label', data.procent + '%' );
-
-        if ( data.complete === false ) {
-            elMessage.innerHTML += data.message + '\n';
-            elMessage.scrollTop = elMessage.scrollHeight;
-            startProcess();
-        } else {
-            elMessage.innerText = 'The process is complete';
-        }
     } );
+    const data = await response.json();
+
+    elProgress.value += 1;
+    elAmountCompleted.innerHTML = elProgress.value;
+    elPercentageCompleted.innerHTML =  Math.floor( ( elProgress.value / maxProducts ) * 100 );
+
+    if ( data.error === true ) {
+        elMessage.innerHTML += ' ERROR: ' + data.errorMessage + '<br>';
+    } else {
+        elMessage.innerHTML += data.message + '<br>';
+        elMessage.scrollTop = elMessage.scrollHeight;
+    }
 }

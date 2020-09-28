@@ -17,4 +17,8 @@ class Helper {
 			yield $a => $b;
 		}
 	}
+
+	public static function debug( $var ) {
+		error_log( var_export( $var, true ) );
+	}
 }

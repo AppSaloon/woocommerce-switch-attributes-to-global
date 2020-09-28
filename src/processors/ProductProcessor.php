@@ -2,7 +2,9 @@
 
 namespace Appsaloon\Processor\Processors;
 
+use Appsaloon\Processor\Lib\Helper;
 use Appsaloon\Processor\Transformers\ProductAttributesTransformer;
+use PHPUnit\TextUI\Help;
 
 class ProductProcessor {
 
@@ -44,12 +46,17 @@ class ProductProcessor {
 	public function checkProduct( $offset ) {
 		$productId = $this->getProductId( $offset );
 
+		if ( empty( $productId ) ) {
+			return new \WP_Error( '500', 'Product not found.' );
+		}
+
 		$productTransformer = ( new ProductAttributesTransformer() )->setProduct( $productId );
 
-		if( $productTransformer->hasWrongAttributes() ) {
+		if ( $productTransformer->hasWrongAttributes() ) {
 			$transformed = $productTransformer->transformAttributes();
 
-			if( is_wp_error( $transformed ) ) {
+			if ( is_wp_error( $transformed ) ) {
+				$transformed->errors[500][0] .= ' (product ID: ' . $productId . ')';
 				return $transformed;
 			}
 		}
@@ -58,13 +65,17 @@ class ProductProcessor {
 	}
 
 	public function getTotalProducts() {
-		$query = "SELECT count(*) FROM " . $this->wpdb->posts . " WHERE post_type = 'product'";
+		$query = "SELECT count(*) 
+					FROM " . $this->wpdb->posts . " as wp
+					WHERE post_type = 'product'";
 
 		return $this->wpdb->get_var( $query );
 	}
 
 	public function getProductId( $offset ) {
-		$query = "SELECT ID FROM " . $this->wpdb->posts . " WHERE post_type='product' ORDER BY ID ASC LIMIT " . $offset . ",1";
+		$query = $this->wpdb->prepare(
+			"SELECT ID FROM " . $this->wpdb->posts . " WHERE post_type='product' ORDER BY ID ASC LIMIT %d,1", $offset
+		);
 
 		return $this->wpdb->get_var( $query );
 	}

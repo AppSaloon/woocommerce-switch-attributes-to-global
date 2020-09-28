@@ -20,17 +20,23 @@ class ProductAttributesTransformer {
 	private $attributeController;
 
 	public function setProduct( $productid ) {
-		$this->attributeController = new AttributeController();
 		$this->product             = wc_get_product( $productid );
+		$this->attributeController = new AttributeController($this->product);
 
 		$this->attributes = $this->product->get_attributes();
 
 		return $this;
 	}
 
+	/**
+	 * Returns true when the attribute is not global
+	 *
+	 * @return bool
+	 */
 	public function hasWrongAttributes() {
-		foreach ( Helper::generator( $this->attributes ) as $taxonomy => $ProductAttribute ) {
-			if ( ! empty( $ProductAttribute->get_options() ) ) {
+		foreach ( Helper::generator( $this->attributes ) as $taxonomy => $productAttribute ) {
+
+			if ( ! empty( $productAttribute['value'] ) ) {
 				return true;
 			}
 		}
@@ -38,37 +44,26 @@ class ProductAttributesTransformer {
 		return false;
 	}
 
-
+	/**
+	 * Transform product attribute into global attribute
+	 *
+	 * @return boolean|\WP_Error
+	 */
 	public function transformAttributes() {
-		foreach ( Helper::generator( $this->attributes ) as $taxonomy => $ProductAttribute ) {
-			// get options
-			$this->debug( $ProductAttribute->get_options() );
-			$options = $ProductAttribute->get_options();
+		/**
+		 * @var $ProductAttribute \WC_Product_Attribute
+		 */
+		foreach ( Helper::generator( $this->attributes ) as $taxonomy => $productAttribute ) {
+			// transforms only product attributes and not global attributes
+			if ( ! empty( $productAttribute['value'] ) ) {
+				$result = $this->attributeController->transform_product_attribute_to_global( $taxonomy, $productAttribute );
 
-			if ( ! empty( $options ) ) {
-				$this->attributeController->set_product_attributes( $this->product, array( $taxonomy => $options ) );
-
-				// update children - post meta
-				$this->update_children_post_meta();
+				if( is_wp_error( $result ) ) {
+					return $result;
+				}
 			}
 		}
 
-		return new \WP_Error( '500', print_r( $this->attributes, true ) );
-	}
-
-	private function generate_global_attribute( $taxonomy, $attribute_value ) {
-
-	}
-
-	private function update_children_post_meta() {
-
-	}
-
-	private function assign_to_product( $attribute ) {
-
-	}
-
-	private function debug( $var ) {
-		return new \WP_Error( '500', print_r( $var, true ) );
+		return true;
 	}
 }
