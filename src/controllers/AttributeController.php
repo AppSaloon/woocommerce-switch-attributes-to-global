@@ -64,24 +64,15 @@ class AttributeController {
 		$this->taxonomy         = $taxonomy;
 		$this->productAttribute = $productAttribute;
 
-		// taxonomy name update
-		// this adds pa_ prefix to custom product attribute
-		// so the taxonomy name matches the global attribute name rule
-		$this->newTaxonomy = 'pa_' . $this->taxonomy;
-
-		// retrieve old attribute information
-		$attribute_id = wc_attribute_taxonomy_id_by_name( $this->taxonomy );
-
-		// taxonomy does not exist so create it
-		if ( 0 === $attribute_id ) {
-			wc_create_attribute( array( 'name' => $productAttribute->get_taxonomy() ) );
-			$result = $this->register_attribute( $taxonomy );
-
-			if( is_wp_error( $result ) ) {
-				$result->errors[500][0] .= ' (Taxonomy: ' . $taxonomy . ')';
-				return $result;
-			}
+		// skip this if the taxonomy is a global attribute
+		if ( strpos( $taxonomy, 'pa_' ) === 0 ) {
+			return true;
 		}
+
+		$this->create_or_get_unique_taxonomy();
+
+		//Helper::debug( $this->product->get_id() );
+		//Helper::debug( [ "taxonomy" => $this->taxonomy, "newtaxonomy" => $this->newTaxonomy ] );
 
 		$attribute = $this->get_or_create_attribute();
 
@@ -89,9 +80,6 @@ class AttributeController {
 			return $attribute;
 		}
 
-		Helper::debug( $this->product->get_id() );
-		Helper::debug( 'Taxonomy' );
-		Helper::debug( $this->newTaxonomy );
 		// retrieve existing product attributes
 		$attributes = $this->product->get_attributes();
 
@@ -101,62 +89,24 @@ class AttributeController {
 		// adding new global taxonomy
 		$attributes[ $this->newTaxonomy ] = $attribute;
 
-		Helper::debug( 'Attributes' );
-		Helper::debug( $attributes );
+		//Helper::debug( 'Attributes' );
+		//Helper::debug( $attributes );
 
 		// update product attributes
 		$this->product->set_attributes( $attributes );
 
 		$this->product->save();
 
-		//@todo kunnen we dit ergens anders gebruiken??
+		// update product variations post meta
 		if ( $this->product->is_type( 'variable' ) ) {
-			$this->update_post_meta_attribute();
+			$result = $this->update_post_meta_attribute();
+
+			if( is_wp_error( $result ) ) {
+				return $result;
+			}
 		}
 
 		return true;
-	}
-
-	/**
-	 * Register taxonomy in global variable wc_product_attributes
-	 *
-	 * @param $attribute_name
-	 *
-	 * @since 1.0.0
-	 */
-	private function register_attribute( $attribute_name ) {
-		global $wc_product_attributes;
-
-		// Register as taxonomy while importing.
-		$taxonomy_name = wc_attribute_taxonomy_name( $attribute_name );
-
-		if( empty( $taxonomy_name ) ) {
-			return new \WP_Error('500', 'Taxonomy name is not valid');
-		}
-
-		register_taxonomy(
-			$taxonomy_name,
-			apply_filters( 'woocommerce_taxonomy_objects_' . $taxonomy_name, array( 'product' ) ),
-			apply_filters(
-				'woocommerce_taxonomy_args_' . $taxonomy_name,
-				array(
-					'labels'       => array(
-						'name' => $attribute_name,
-					),
-					'hierarchical' => true,
-					'show_ui'      => false,
-					'query_var'    => true,
-					'rewrite'      => false,
-				)
-			)
-		);
-
-		// Set product attributes global.
-		$wc_product_attributes = array();
-
-		foreach ( wc_get_attribute_taxonomies() as $taxonomy ) {
-			$wc_product_attributes[ wc_attribute_taxonomy_name( $taxonomy->attribute_name ) ] = $taxonomy;
-		}
 	}
 
 	/**
@@ -237,6 +187,8 @@ class AttributeController {
 	 * Ex: attribute_artikelcode -> attribute_pa_artikelcode
 	 *
 	 * @since 1.0.0
+	 *
+	 * @return \WP_Error
 	 */
 	private function update_post_meta_attribute() {
 		$prefix      = 'attribute_';
@@ -253,15 +205,13 @@ class AttributeController {
 
 			delete_post_meta( $product_variation_id, $taxonomy );
 
-
 			$term = get_term_by( 'name', $meta_value, $this->newTaxonomy );
 
-			Helper::debug( 'Taxonomy' );
-			Helper::debug( $this->newTaxonomy  );
-			Helper::debug( 'Term'  );
-			Helper::debug( $term  );
-
-			add_post_meta( $product_variation_id, $newTaxonomy, $term->slug );
+			if ( $term instanceof \WP_Term ) {
+				add_post_meta( $product_variation_id, $newTaxonomy, $term->slug );
+			} else {
+				return new \WP_Error('500', 'Product data is not valid');
+			}
 		}
 	}
 
@@ -273,10 +223,89 @@ class AttributeController {
 	 * @since 1.0.0
 	 */
 	private function get_attribute_id() {
-		$query        = $this->wpdb->prepare( "select attribute_id from {$this->wpdb->prefix}woocommerce_attribute_taxonomies where attribute_name = %s",
-			$this->taxonomy );
+		$taxonomy_name = substr( $this->newTaxonomy, 3 );
+		//Helper::debug( [ 'taxonomy_attribute_name' => $taxonomy_name ] );
+
+		$query = $this->wpdb->prepare( "select attribute_id from {$this->wpdb->prefix}woocommerce_attribute_taxonomies where attribute_name = %s",
+			$taxonomy_name );
+
+		//Helper::debug( [ 'query attribute id' => $query ] );
 		$attribute_id = $this->wpdb->get_var( $query );
 
+		//Helper::debug( [ 'query result attribute id' => $attribute_id ] );
+
 		return $attribute_id;
+	}
+
+	private function get_attribute_name_by_label( $label ) {
+		$query = $this->wpdb->prepare( "SELECT attribute_name FROM {$this->wpdb->prefix}woocommerce_attribute_taxonomies WHERE attribute_label=%s",
+			$label );
+
+		return $this->wpdb->get_var( $query );
+	}
+
+	/**
+	 * Updates taxonomy variable if the taxonomy does not match with the taxonomy in productAttribute
+	 *
+	 * @since 1.0.0
+	 */
+	private function create_or_get_unique_taxonomy() {
+		/*Helper::debug( [
+			"productAttribute name" => $this->productAttribute->get_name(),
+		] );*/
+
+		$taxonomy_slug_to_compare = $this->get_attribute_name_by_label( $this->productAttribute->get_name() );
+		//Helper::debug( [ 'attribute_name' => $taxonomy_slug_to_compare ] );
+
+		// Attribute name matched in the database
+		if ( $taxonomy_slug_to_compare !== null ) {
+			//Helper::debug( [ "taxonomy match" => $taxonomy_slug_to_compare ] );
+
+			$this->newTaxonomy = 'pa_' . $taxonomy_slug_to_compare;
+
+			return;
+		}
+
+		// create new taxonomy with preferred slug and name
+		$i                   = 0;
+		$preferred_base_slug = 'pa_' . $this->taxonomy;
+		if ( empty( $this->taxonomy ) ) {
+			$preferred_base_slug .= 'asterisk';
+			//Helper::debug( [ 'asterisk' => $preferred_base_slug, 'asterisk label' => $this->productAttribute->get_name() ] );
+		}
+		$preferred_slug = false;
+		while ( $preferred_slug === false ) {
+			$preferred_slug = $preferred_base_slug;
+			if ( $i > 0 ) {
+				$preferred_slug .= '-' . $i;
+			}
+			if ( taxonomy_exists( $preferred_slug ) ) {
+				$preferred_slug = false;
+				$i ++;
+			}
+		}
+
+		wc_create_attribute( array( 'name' => $this->productAttribute->get_name(), 'slug' => $preferred_slug ) );
+
+		$newTaxonomy = register_taxonomy(
+			$preferred_slug,
+			array( 'product' ),
+			array(
+				'labels'       => array(
+					'name' => $this->productAttribute->get_name(),
+				),
+				'hierarchical' => true,
+				'show_ui'      => false,
+				'query_var'    => true,
+				'rewrite'      => false,
+			)
+		);
+
+		global $wc_product_attributes;
+
+		// Set product attributes global.
+		$wc_product_attributes[ $preferred_slug ] = $newTaxonomy;
+
+		$this->newTaxonomy = $preferred_slug;
 	}
 }

@@ -15,4 +15,6 @@
 
 <p><strong>Note:</strong> The progress will be updated by ajax calls.</p>
 <div id="message" style="width: 100%; white-space: pre; max-height: 300px; overflow-y: auto"></div>
+
+<div id="failed_products" style="width: 100%; white-space: pre; max-height: 300px; overflow-y: auto"></div>
 <?php

@@ -3,6 +3,7 @@ const elProgress = document.getElementById( 'progress_bar' );
 const elBtnProgress = document.getElementById( 'btn_start_process' );
 const elPercentageCompleted = document.getElementById( 'percentage_completed' );
 const elAmountCompleted = document.getElementById( 'amount_completed' );
+const elFailedProducts = document.getElementById( 'failed_products' );
 const maxProducts = elProgress.max;
 
 function startProcess() {
@@ -21,10 +22,12 @@ function startProcess() {
 
     Promise.all( promises ).then(
         function () {
-            console.log( 'David' )
-            elMessage.innerText += 'The process is complete';
+            elMessage.innerHTML += 'The process is complete <br>';
             elBtnProgress.innerHTML = 'Start script';
             elBtnProgress.disabled = false;
+            elProgress.value = 0;
+            elAmountCompleted.innerHTML = '0';
+            elPercentageCompleted.innerHTML = '0';
         }
     );
 }
@@ -45,7 +48,8 @@ async function checkProduct( opts ) {
     elPercentageCompleted.innerHTML =  Math.floor( ( elProgress.value / maxProducts ) * 100 );
 
     if ( data.error === true ) {
-        elMessage.innerHTML += ' ERROR: ' + data.errorMessage + '<br>';
+        elMessage.innerHTML += ' ERROR: ' + data.errorMessage + ', productId: ' + data.productId + '<br>';
+        elFailedProducts.innerHTML += data.productId + '<br>';
     } else {
         elMessage.innerHTML += data.message + '<br>';
         elMessage.scrollTop = elMessage.scrollHeight;

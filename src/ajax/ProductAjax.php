@@ -23,7 +23,7 @@ class ProductAjax {
 		}
 
 		$productProcesser = ProductProcessor::instance();
-		$processedMessage = $productProcesser->checkProduct( $offset );
+		$processedMessage = $productProcesser->checkProduct($offset);
 
 		if ( is_wp_error( $processedMessage ) ) {
 			$error        = true;
@@ -33,6 +33,7 @@ class ProductAjax {
 		}
 
 		wp_send_json( array(
+			'productId'    => $productProcesser->productId,
 			'message'      => $message,
 			'error'        => $error,
 			'errorMessage' => $errorMessage,

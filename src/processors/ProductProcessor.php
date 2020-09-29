@@ -8,6 +8,8 @@ use PHPUnit\TextUI\Help;
 
 class ProductProcessor {
 
+	public $productId;
+
 	/**
 	 * @var \wpdb
 	 */
@@ -44,24 +46,23 @@ class ProductProcessor {
 	 * @return string|void|null|\WP_Error
 	 */
 	public function checkProduct( $offset ) {
-		$productId = $this->getProductId( $offset );
+		$this->productId = $this->getProductId( $offset );
 
-		if ( empty( $productId ) ) {
+		if ( empty( $this->productId ) ) {
 			return new \WP_Error( '500', 'Product not found.' );
 		}
 
-		$productTransformer = ( new ProductAttributesTransformer() )->setProduct( $productId );
+		$productTransformer = ( new ProductAttributesTransformer() )->setProduct( $this->productId );
 
 		if ( $productTransformer->hasWrongAttributes() ) {
 			$transformed = $productTransformer->transformAttributes();
 
 			if ( is_wp_error( $transformed ) ) {
-				$transformed->errors[500][0] .= ' (product ID: ' . $productId . ')';
 				return $transformed;
 			}
 		}
 
-		return $productId;
+		return $this->productId;
 	}
 
 	public function getTotalProducts() {
