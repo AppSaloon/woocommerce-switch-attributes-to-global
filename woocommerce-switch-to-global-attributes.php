@@ -12,7 +12,7 @@ Requires PHP: 7.0
 Requires at least: 5.0
 Tested up to: 5.3
 Stable tag: 1.0.0
-Version: 1.0.1
+Version: 1.0.1-dev
 */
 
 define( 'AP_DIR', __DIR__ . DIRECTORY_SEPARATOR );

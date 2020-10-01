@@ -2,13 +2,15 @@
 
 namespace Appsaloon\Processor\Lib;
 
+use Generator;
+
 class Helper {
 	/**
 	 * Loops array one by one
 	 *
 	 * @param $array
 	 *
-	 * @return \Generator
+	 * @return Generator
 	 *
 	 * @since 1.0.0
 	 */

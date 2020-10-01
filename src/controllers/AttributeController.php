@@ -2,310 +2,339 @@
 
 namespace Appsaloon\Processor\Controllers;
 
-use Appsaloon\Processor\Lib\Helper;
-use PHPUnit\TextUI\Help;
-use WC_Product;
-use WC_Product_Simple;
+use Appsaloon\Processor\Lib\MessageLog;
+use Exception;
 use WC_Product_Variable;
 use WC_Product_Attribute;
+use WP_Error;
+use WP_Term;
 
-class AttributeController {
+class AttributeController
+{
 
-	/**
-	 * @var WC_Product_Variable
-	 */
-	private $product;
+    /**
+     * @var WC_Product_Variable
+     */
+    private $product;
 
-	/**
-	 * @var string
-	 */
-	private $taxonomy;
+    /**
+     * @var string
+     */
+    private $taxonomy;
 
-	/**
-	 * @var string
-	 */
-	private $newTaxonomy;
+    /**
+     * @var string
+     */
+    private $newTaxonomy;
 
-	/**
-	 * @var WC_Product_Attribute
-	 */
-	private $productAttribute;
+    /**
+     * @var WC_Product_Attribute
+     */
+    private $productAttribute;
+    /**
+     * @var MessageLog
+     */
+    private $messageLog;
 
-	/**
-	 * @var \QM_DB|\wpdb
-	 */
-	private $wpdb;
+    /**
+     * AttributeController constructor.
+     *
+     * @param WC_Product_Variable $product
+     * @param MessageLog $messageLog
+     * @param string $taxonomy
+     * @param WC_Product_Attribute $productAttribute
+     */
+    public function __construct(
+        WC_Product_Variable $product,
+        MessageLog $messageLog,
+        string $taxonomy,
+        WC_Product_Attribute $productAttribute
+    )
+    {
+        $this->product = $product;
+        $this->messageLog = $messageLog;
+        $this->taxonomy = $taxonomy;
+        $this->productAttribute = $productAttribute;
+    }
 
-	/**
-	 * AttributeController constructor.
-	 *
-	 * @param  WC_Product|WC_Product_Variable|WC_Product_Simple  $product
-	 *
-	 */
-	public function __construct( $product ) {
-		global $wpdb;
+    /**
+     * Set Product attributes
+     *
+     * @throws Exception
+     * @since 1.0.0
+     * @version 1.0.3
+     */
+    public function transform_product_attribute_to_global()
+    {
+        $this->messageLog->add_message('taxonomy: ' . $this->taxonomy);
+        // skip this if the taxonomy is a global attribute
+        if (strpos($this->taxonomy, 'pa_') === 0) {
+            $this->messageLog->add_message('taxonomy is already global');
+            return;
+        }
 
-		$this->product = $product;
-		$this->wpdb    = $wpdb;
-	}
+        $this->create_or_get_unique_taxonomy();
 
-	/**
-	 * Set Product attributes
-	 *
-	 * @param  string  $taxonomy
-	 * @param  \WC_Product_Attribute  $productAttribute
-	 *
-	 * @return boolean|\WP_Error $product
-	 *
-	 * @version 1.0.3
-	 * @since 1.0.0
-	 */
-	public function transform_product_attribute_to_global( $taxonomy, $productAttribute ) {
-		$this->taxonomy         = $taxonomy;
-		$this->productAttribute = $productAttribute;
+        //Helper::debug( $this->product->get_id() );
+        //Helper::debug( [ "taxonomy" => $this->taxonomy, "newtaxonomy" => $this->newTaxonomy ] );
 
-		// skip this if the taxonomy is a global attribute
-		if ( strpos( $taxonomy, 'pa_' ) === 0 ) {
-			return true;
-		}
+        $attribute = $this->get_or_create_attribute();
 
-		$this->create_or_get_unique_taxonomy();
+        $this->messageLog->add_message('attribute id: ' . $attribute->get_id());
+        $this->messageLog->add_message('attribute name: ' . $attribute->get_name());
+        $this->messageLog->add_message('attribute taxonomy: ' . $attribute->get_taxonomy());
 
-		//Helper::debug( $this->product->get_id() );
-		//Helper::debug( [ "taxonomy" => $this->taxonomy, "newtaxonomy" => $this->newTaxonomy ] );
+        // retrieve existing product attributes
+        $attributes = $this->product->get_attributes();
 
-		$attribute = $this->get_or_create_attribute();
+        // remove old custom taxonomy
+        unset($attributes[$this->taxonomy]);
 
-		if ( is_wp_error( $attribute ) ) {
-			return $attribute;
-		}
+        // adding new global taxonomy
+        $attributes[$this->newTaxonomy] = $attribute;
 
-		// retrieve existing product attributes
-		$attributes = $this->product->get_attributes();
+        //Helper::debug( 'Attributes' );
+        //Helper::debug( $attributes );
 
-		// remove old custom taxonomy
-		unset( $attributes[ $this->taxonomy ] );
+        // update product attributes
+        $this->product->set_attributes($attributes);
 
-		// adding new global taxonomy
-		$attributes[ $this->newTaxonomy ] = $attribute;
+        $this->product->save();
 
-		//Helper::debug( 'Attributes' );
-		//Helper::debug( $attributes );
+        // update product variations post meta
+        $this->update_post_meta_attribute();
+    }
 
-		// update product attributes
-		$this->product->set_attributes( $attributes );
+    /**
+     * Generates an attribute to use in WooCommerce
+     *
+     * @return WC_Product_Attribute
+     *
+     * @throws Exception
+     * @since 1.0.0
+     */
+    private function get_or_create_attribute()
+    {
+        // @TODO: how does this function GET or create an attribute? it only creates.
 
-		$this->product->save();
+        if(empty($this->productAttribute['value'])) {
+            throw new Exception('Empty value for product attribute: ' . $this->productAttribute->get_name());
+        }
 
-		// update product variations post meta
-		if ( $this->product->is_type( 'variable' ) ) {
-			$result = $this->update_post_meta_attribute();
+        $terms = explode(' | ', $this->productAttribute['value']);
+        $terms = array_unique($terms);
 
-			if( is_wp_error( $result ) ) {
-				return $result;
-			}
-		}
+//        $term_ids = array();
+        foreach ($terms as $term) {
+            $this->messageLog->add_message('term: ' . $term);
+            $newTerm = $this->create_term($term);
 
-		return true;
-	}
+            if (is_wp_error($newTerm)) {
+                $this->messageLog->add_message('could not create term: ' . $newTerm->get_error_message());
+                throw new Exception($newTerm->get_error_message());
+            }
+//            $term_ids[] = $newTerm;
+            // update post meta
+        }
 
-	/**
-	 * Generates an attribute to use in WooCommerce
-	 *
-	 * @return \WC_Product_Attribute|\WP_Error
-	 *
-	 * @since 1.0.0
-	 */
-	private function get_or_create_attribute() {
-		$terms = explode( ' | ', $this->productAttribute['value'] );
+        return $this->create_product_attribute($terms);
+    }
 
-		$term_ids = array();
-		foreach ( $terms as $term ) {
-			$newTerm = $this->create_term( $term );
+    /**
+     * Creates product attribute
+     *
+     * @param $options
+     *
+     * @return WC_Product_Attribute
+     *
+     * @since 1.0.0
+     */
+    private function create_product_attribute($options)
+    {
+        $attribute = new WC_Product_Attribute();
 
-			if ( is_wp_error( $newTerm ) ) {
-				return $newTerm;
-			}
-			$term_ids[] = $newTerm;
-			// update post meta
-		}
+        $attribute->set_id($this->get_attribute_id());
+        $attribute->set_name($this->newTaxonomy);
+        $attribute->set_options($options);
+        $attribute->set_visible($this->productAttribute->get_visible());
+        $attribute->set_variation($this->productAttribute->get_variation());
 
-		return $this->create_product_attribute( $terms );
-	}
+        return $attribute;
+    }
 
-	/**
-	 * Creates product attribute
-	 *
-	 * @param $options
-	 *
-	 * @return \WC_Product_Attribute
-	 *
-	 * @since 1.0.0
-	 */
-	private function create_product_attribute( $options ) {
-		$attribute = new \WC_Product_Attribute();
+    /**
+     * Creates new term and returns term_id
+     * or
+     * Gets existing term and return term_id
+     *
+     * @param $term
+     *
+     * @return int|WP_Error
+     *
+     * @since 1.0.0
+     */
+    private function create_term($term)
+    {
+        $term = wp_insert_term($term, $this->newTaxonomy);
 
-		$attribute->set_id( $this->get_attribute_id() );
-		$attribute->set_name( $this->newTaxonomy );
-		$attribute->set_options( $options );
-		$attribute->set_visible( $this->productAttribute->get_visible() );
-		$attribute->set_variation( $this->productAttribute->get_variation() );
+        if (is_wp_error($term)) {
+            if (isset($term->error_data['term_exists'])) {
+                $term_id = $term->error_data['term_exists'];
+            } else {
+                return $term;
+            }
+        } else {
+            $term_id = $term['term_id'];
+        }
 
-		return $attribute;
-	}
+        return $term_id;
+    }
 
-	/**
-	 * Creates new term and returns term_id
-	 * or
-	 * Gets existing term and return term_id
-	 *
-	 * @param $term
-	 *
-	 * @return int|\WP_Error
-	 *
-	 * @since 1.0.0
-	 */
-	private function create_term( $term ) {
-		$term = wp_insert_term( $term, $this->newTaxonomy );
+    /**
+     * Updates post meta values for product variations
+     *
+     * Ex: attribute_artikelcode -> attribute_pa_artikelcode
+     *
+     * @throws Exception
+     * @since 1.0.0
+     *
+     */
+    private function update_post_meta_attribute()
+    {
+        $prefix = 'attribute_';
+        $taxonomy = $prefix . $this->taxonomy;
+        $newTaxonomy = $prefix . $this->newTaxonomy;
 
-		if ( is_wp_error( $term ) ) {
-			if ( isset( $term->error_data['term_exists'] ) ) {
-				$term_id = $term->error_data['term_exists'];
-			} else {
-				return $term;
-			}
-		} else {
-			$term_id = $term['term_id'];
-		}
+        $this->messageLog->add_message('upma taxonomy: ' . $taxonomy);
+        $this->messageLog->add_message('upma newTaxonomy: ' . $newTaxonomy);
 
-		return $term_id;
-	}
+        // get all variations
+        foreach ($this->product->get_children() as $product_variation_id) {
+            $this->messageLog->add_message('upma product variation id: ' . $product_variation_id);
+            $meta_value = get_post_meta($product_variation_id, $taxonomy, true);
 
-	/**
-	 * Updates post meta values for product variations
-	 *
-	 * Ex: attribute_artikelcode -> attribute_pa_artikelcode
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return \WP_Error
-	 */
-	private function update_post_meta_attribute() {
-		$prefix      = 'attribute_';
-		$taxonomy    = $prefix . $this->taxonomy;
-		$newTaxonomy = $prefix . $this->newTaxonomy;
+            if (empty($meta_value)) {
+                continue;
+            }
 
-		// get all variations
-		foreach ( $this->product->get_children() as $product_variation_id ) {
-			$meta_value = get_post_meta( $product_variation_id, $taxonomy, true );
+            delete_post_meta($product_variation_id, $taxonomy);
 
-			if ( empty( $meta_value ) ) {
-				continue;
-			}
+            $this->messageLog->add_message('upma get term by name ' . $meta_value);
+            $term = get_term_by('name', $meta_value, $this->newTaxonomy);
 
-			delete_post_meta( $product_variation_id, $taxonomy );
+            if ($term instanceof WP_Term) {
+                add_post_meta($product_variation_id, $newTaxonomy, $term->slug);
+            } else {
+                throw new Exception('Could not create metadata for variation id: ' . $product_variation_id);
+            }
+        }
+    }
 
-			$term = get_term_by( 'name', $meta_value, $this->newTaxonomy );
+    /**
+     * Get WooCommerce attribute ID by taxonomy name
+     *
+     * @return null|string
+     *
+     * @since 1.0.0
+     */
+    private function get_attribute_id()
+    {
+        global $wpdb;
 
-			if ( $term instanceof \WP_Term ) {
-				add_post_meta( $product_variation_id, $newTaxonomy, $term->slug );
-			} else {
-				return new \WP_Error('500', 'Product data is not valid');
-			}
-		}
-	}
+        $taxonomy_name = substr($this->newTaxonomy, 3);
+        //Helper::debug( [ 'taxonomy_attribute_name' => $taxonomy_name ] );
 
-	/**
-	 * Get WooCommerce attribute ID by taxonomy name
-	 *
-	 * @return null|string
-	 *
-	 * @since 1.0.0
-	 */
-	private function get_attribute_id() {
-		$taxonomy_name = substr( $this->newTaxonomy, 3 );
-		//Helper::debug( [ 'taxonomy_attribute_name' => $taxonomy_name ] );
+        $query = "select attribute_id from {$wpdb->prefix}woocommerce_attribute_taxonomies where attribute_name=%s";
+        $query = $wpdb->prepare($query, $taxonomy_name);
 
-		$query = $this->wpdb->prepare( "select attribute_id from {$this->wpdb->prefix}woocommerce_attribute_taxonomies where attribute_name = %s",
-			$taxonomy_name );
+        //Helper::debug( [ 'query attribute id' => $query ] );
+        return $wpdb->get_var($query);
+    }
 
-		//Helper::debug( [ 'query attribute id' => $query ] );
-		$attribute_id = $this->wpdb->get_var( $query );
+    private function get_attribute_name_by_label($label)
+    {
+        global $wpdb;
+        $query = "SELECT attribute_name FROM {$wpdb->prefix}woocommerce_attribute_taxonomies WHERE attribute_label=%s";
+        $query = $wpdb->prepare($query, $label);
 
-		//Helper::debug( [ 'query result attribute id' => $attribute_id ] );
+        return $wpdb->get_var($query);
+    }
 
-		return $attribute_id;
-	}
+    /**
+     * Updates taxonomy variable if the taxonomy does not match with the taxonomy in productAttribute
+     *
+     * @since 1.0.0
+     */
+    private function create_or_get_unique_taxonomy()
+    {
+        $this->messageLog->add_message('attribute name: ' . $this->productAttribute->get_name());
 
-	private function get_attribute_name_by_label( $label ) {
-		$query = $this->wpdb->prepare( "SELECT attribute_name FROM {$this->wpdb->prefix}woocommerce_attribute_taxonomies WHERE attribute_label=%s",
-			$label );
+        try {
+            // Attribute name matched in the database
+            $this->newTaxonomy = 'pa_' . $this->get_attribute_name_by_label_case_sensitive($this->productAttribute->get_name());
+            $this->messageLog->add_message('attribute name existed in DB');
 
-		return $this->wpdb->get_var( $query );
-	}
+            return;
+        } catch(Exception $exception) {
 
-	/**
-	 * Updates taxonomy variable if the taxonomy does not match with the taxonomy in productAttribute
-	 *
-	 * @since 1.0.0
-	 */
-	private function create_or_get_unique_taxonomy() {
-		/*Helper::debug( [
-			"productAttribute name" => $this->productAttribute->get_name(),
-		] );*/
+        }
 
-		$taxonomy_slug_to_compare = $this->get_attribute_name_by_label( $this->productAttribute->get_name() );
-		//Helper::debug( [ 'attribute_name' => $taxonomy_slug_to_compare ] );
+        // create new taxonomy with preferred slug and name
+        $i = 0;
+        $preferred_base_slug = 'pa_' . $this->taxonomy;
+        if (empty($this->taxonomy)) {
+            $preferred_base_slug .= 'asterisk';
+            //Helper::debug( [ 'asterisk' => $preferred_base_slug, 'asterisk label' => $this->productAttribute->get_name() ] );
+        }
+        $preferred_slug = false;
+        while ($preferred_slug === false) {
+            $preferred_slug = $preferred_base_slug;
+            if ($i > 0) {
+                $preferred_slug .= '-' . $i;
+            }
+            if (taxonomy_exists($preferred_slug)) {
+                $preferred_slug = false;
+                $i++;
+            }
+        }
+        $this->messageLog->add_message('preferred slug: ' . $preferred_slug);
 
-		// Attribute name matched in the database
-		if ( $taxonomy_slug_to_compare !== null ) {
-			//Helper::debug( [ "taxonomy match" => $taxonomy_slug_to_compare ] );
+        wc_create_attribute(array('name' => $this->productAttribute->get_name(), 'slug' => $preferred_slug));
 
-			$this->newTaxonomy = 'pa_' . $taxonomy_slug_to_compare;
+        $newTaxonomy = register_taxonomy(
+            $preferred_slug,
+            array('product'),
+            array(
+                'labels' => array(
+                    'name' => $this->productAttribute->get_name(),
+                ),
+                'hierarchical' => true,
+                'show_ui' => false,
+                'query_var' => true,
+                'rewrite' => false,
+            )
+        );
 
-			return;
-		}
+        global $wc_product_attributes;
 
-		// create new taxonomy with preferred slug and name
-		$i                   = 0;
-		$preferred_base_slug = 'pa_' . $this->taxonomy;
-		if ( empty( $this->taxonomy ) ) {
-			$preferred_base_slug .= 'asterisk';
-			//Helper::debug( [ 'asterisk' => $preferred_base_slug, 'asterisk label' => $this->productAttribute->get_name() ] );
-		}
-		$preferred_slug = false;
-		while ( $preferred_slug === false ) {
-			$preferred_slug = $preferred_base_slug;
-			if ( $i > 0 ) {
-				$preferred_slug .= '-' . $i;
-			}
-			if ( taxonomy_exists( $preferred_slug ) ) {
-				$preferred_slug = false;
-				$i ++;
-			}
-		}
+        // Set product attributes global.
+        $wc_product_attributes[$preferred_slug] = $newTaxonomy;
 
-		wc_create_attribute( array( 'name' => $this->productAttribute->get_name(), 'slug' => $preferred_slug ) );
+        $this->newTaxonomy = $preferred_slug;
+    }
 
-		$newTaxonomy = register_taxonomy(
-			$preferred_slug,
-			array( 'product' ),
-			array(
-				'labels'       => array(
-					'name' => $this->productAttribute->get_name(),
-				),
-				'hierarchical' => true,
-				'show_ui'      => false,
-				'query_var'    => true,
-				'rewrite'      => false,
-			)
-		);
-
-		global $wc_product_attributes;
-
-		// Set product attributes global.
-		$wc_product_attributes[ $preferred_slug ] = $newTaxonomy;
-
-		$this->newTaxonomy = $preferred_slug;
-	}
+    /**
+     * @param string $label
+     * @return string
+     * @throws Exception
+     */
+    private function get_attribute_name_by_label_case_sensitive(string $label): string {
+        $attributeTaxonomies = wc_get_attribute_taxonomies();
+        foreach($attributeTaxonomies as $attributeTaxonomy) {
+            if($attributeTaxonomy->attribute_label === $label) {
+                return $attributeTaxonomy->attribute_name;
+            }
+        }
+        throw new Exception(('attribute taxonomy does not exist'));
+    }
 }

@@ -1,57 +1,91 @@
-const elMessage = document.getElementById( 'message' );
-const elProgress = document.getElementById( 'progress_bar' );
-const elBtnProgress = document.getElementById( 'btn_start_process' );
-const elPercentageCompleted = document.getElementById( 'percentage_completed' );
-const elAmountCompleted = document.getElementById( 'amount_completed' );
-const elFailedProducts = document.getElementById( 'failed_products' );
-const maxProducts = elProgress.max;
+const elMessage = document.getElementById('message')
+const elProgress = document.getElementById('progress_bar')
+const elBtnProgress = document.getElementById('btn_start_process')
+const elPercentageCompleted = document.getElementById('percentage_completed')
+const elAmountCompleted = document.getElementById('amount_completed')
+const elFailedProducts = document.getElementById('failed_products')
+const maxProducts = elProgress.max
 
-function startProcess() {
-    const action = ap_progress.action;
-    const promises = [];
-    for ( let i = 0; i < maxProducts; i++ ) {
-        const promise = new Promise( function ( resolve ) {
-            const opts = 'action=' + action + '&offset=' + i + '&max=' + maxProducts;
-            checkProduct( opts ).then( resolve );
-        } )
-        promises.push( promise )
-    }
+let abortController = new AbortController()
 
-    elBtnProgress.innerHTML = 'IN PROGRESS';
-    elBtnProgress.disabled = true;
-
-    Promise.all( promises ).then(
-        function () {
-            elMessage.innerHTML += 'The process is complete <br>';
-            elBtnProgress.innerHTML = 'Start script';
-            elBtnProgress.disabled = false;
-            elProgress.value = 0;
-            elAmountCompleted.innerHTML = '0';
-            elPercentageCompleted.innerHTML = '0';
-        }
-    );
+function init () {
+  console.log('init')
+  abortController = new AbortController()
+  elBtnProgress.innerHTML = 'Start script'
+  elBtnProgress.removeEventListener('click', abort)
+  elBtnProgress.addEventListener('click', startProcess)
 }
 
-async function checkProduct( opts ) {
-    const response = await fetch( ajaxurl, {
-        method: 'post',
-        credentials: 'same-origin',
-        body: opts,
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
-        }
-    } );
-    const data = await response.json();
+init()
 
-    elProgress.value += 1;
-    elAmountCompleted.innerHTML = elProgress.value;
-    elPercentageCompleted.innerHTML =  Math.floor( ( elProgress.value / maxProducts ) * 100 );
+function abort () {
+  console.log('abort')
+  abortController.abort()
+  init()
+}
 
-    if ( data.error === true ) {
-        elMessage.innerHTML += ' ERROR: ' + data.errorMessage + ', productId: ' + data.productId + '<br>';
-        elFailedProducts.innerHTML += data.productId + '<br>';
-    } else {
-        elMessage.innerHTML += data.message + '<br>';
-        elMessage.scrollTop = elMessage.scrollHeight;
+function startProcess () {
+  console.log('startprocess')
+  const action = ap_progress.action
+  const promises = []
+  for (let i = 0; i < maxProducts; i++) {
+    const promise = new Promise(function (resolve) {
+      const options = 'action=' + action + '&offset=' + i + '&max=' + maxProducts
+      checkProduct(options, abortController.signal).then(resolve)
+    })
+    promises.push(promise)
+  }
+
+  elBtnProgress.innerHTML = 'IN PROGRESS (click to stop)'
+  elBtnProgress.addEventListener('click', abort)
+  elBtnProgress.removeEventListener('click', startProcess)
+  elFailedProducts.innerHTML = ''
+  elMessage.innerHTML = ''
+
+  Promise.all(promises).then(() => {
+    elProgress.value = 0
+    elAmountCompleted.innerHTML = '0'
+    elPercentageCompleted.innerHTML = '0'
+    init()
+    elMessage.innerHTML += 'The process is complete <br>'
+  }).catch((error) => {})
+}
+
+async function checkProduct (options, abortSignal) {
+  const response = await fetch(ajaxurl, {
+    method: 'post',
+    signal: abortSignal,
+    credentials: 'same-origin',
+    body: options,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
     }
+  })
+  const data = await response.json()
+
+  elProgress.value += 1
+  elAmountCompleted.innerHTML = elProgress.value
+  elPercentageCompleted.innerHTML = String(Math.floor((elProgress.value / maxProducts) * 100))
+
+  const productContainer = document.createElement('fieldset')
+  productContainer.style.all = 'revert'
+  const productIdContainer = document.createElement('legend')
+  productIdContainer.innerText = `ProductId: ${data.productId}`
+  productContainer.appendChild(productIdContainer)
+  const messagesContainer = document.createElement('ul')
+  messagesContainer.style.all = 'revert'
+  data.messages.forEach((message) => {
+    const messageContainer = document.createElement('li')
+    messageContainer.innerText = message
+    messagesContainer.appendChild(messageContainer)
+  })
+  productContainer.appendChild(messagesContainer)
+
+  if (data.error === true) {
+    elFailedProducts.appendChild(productContainer)
+    elFailedProducts.scrollTop = elFailedProducts.scrollHeight
+  } else {
+    elMessage.appendChild(productContainer)
+    elMessage.scrollTop = elMessage.scrollHeight
+  }
 }

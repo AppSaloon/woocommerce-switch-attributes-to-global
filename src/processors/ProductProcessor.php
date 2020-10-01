@@ -2,82 +2,72 @@
 
 namespace Appsaloon\Processor\Processors;
 
-use Appsaloon\Processor\Lib\Helper;
+use Appsaloon\Processor\Lib\MessageLog;
 use Appsaloon\Processor\Transformers\ProductAttributesTransformer;
-use PHPUnit\TextUI\Help;
+use Exception;
 
-class ProductProcessor {
+/**
+ * Class ProductProcessor
+ * @package Appsaloon\Processor\Processors
+ */
+class ProductProcessor
+{
 
-	public $productId;
+    /**
+     * @var int
+     */
+    public $productId;
+    /**
+     * @var MessageLog
+     */
+    private $messageLog;
 
-	/**
-	 * @var \wpdb
-	 */
-	private $wpdb;
+    /**
+     * ProductProcessor constructor.
+     * @param int $productId
+     * @param MessageLog $messageLog
+     */
+    public function __construct(int $productId, MessageLog $messageLog)
+    {
+        $this->productId = $productId;
+        $this->messageLog = $messageLog;
+    }
 
-	/**
-	 * Instance where the ProductProcessor object gets saved
-	 *
-	 * @var null|ProductProcessor
-	 */
-	private static $instance = null;
+    /**
+     * @throws Exception
+     */
+    public function processProduct()
+    {
+        $productTransformer = new ProductAttributesTransformer($this->productId, $this->messageLog);
 
-	/**
-	 * @return ProductProcessor|null
-	 */
-	public static function instance() {
-		// Check if instance is already exists
-		if ( self::$instance == null ) {
-			self::$instance = new ProductProcessor();
-		}
+        if ($productTransformer->hasInvalidAttributes()) {
+            $productTransformer->transformAttributes();
+        } else {
+            $this->messageLog->add_message('Product has no invalid attributes');
+        }
+    }
 
-		return self::$instance;
-	}
+    /**
+     * @return string|null
+     */
+    public static function getTotalProducts()
+    {
+        global $wpdb;
+        $query = "SELECT COUNT(*) FROM " . $wpdb->posts . " WHERE post_type = 'product'";
 
-	public function __construct() {
-		global $wpdb;
+        return $wpdb->get_var($query);
+    }
 
-		$this->wpdb = $wpdb;
-	}
+    /**
+     * @param $offset
+     * @return string|null
+     */
+    public static function getProductId($offset)
+    {
+        global $wpdb;
+        $query = "SELECT ID FROM " . $wpdb->posts . " WHERE post_type='product' ORDER BY ID LIMIT %d,1";
+        $query = $wpdb->prepare($query, $offset);
 
-	/**
-	 * @param $offset
-	 *
-	 * @return string|void|null|\WP_Error
-	 */
-	public function checkProduct( $offset ) {
-		$this->productId = $this->getProductId( $offset );
-
-		if ( empty( $this->productId ) ) {
-			return new \WP_Error( '500', 'Product not found.' );
-		}
-
-		$productTransformer = ( new ProductAttributesTransformer() )->setProduct( $this->productId );
-
-		if ( $productTransformer->hasWrongAttributes() ) {
-			$transformed = $productTransformer->transformAttributes();
-
-			if ( is_wp_error( $transformed ) ) {
-				return $transformed;
-			}
-		}
-
-		return $this->productId;
-	}
-
-	public function getTotalProducts() {
-		$query = "SELECT count(*) 
-					FROM " . $this->wpdb->posts . " as wp
-					WHERE post_type = 'product'";
-
-		return $this->wpdb->get_var( $query );
-	}
-
-	public function getProductId( $offset ) {
-		$query = $this->wpdb->prepare(
-			"SELECT ID FROM " . $this->wpdb->posts . " WHERE post_type='product' ORDER BY ID ASC LIMIT %d,1", $offset
-		);
-
-		return $this->wpdb->get_var( $query );
-	}
+        return $wpdb->get_var($query);
+    }
 }

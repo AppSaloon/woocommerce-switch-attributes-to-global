@@ -2,42 +2,79 @@
 
 namespace Appsaloon\Processor\Ajax;
 
+use Appsaloon\Processor\Lib\MessageLog;
 use Appsaloon\Processor\Processors\ProductProcessor;
+use Exception;
 
-class ProductAjax {
+/**
+ * Class ProductAjax
+ * @package Appsaloon\Processor\Ajax
+ */
+class ProductAjax
+{
 
-	public function register() {
-		add_action( 'wp_ajax_product_attributes', array( $this, 'check_product_attributes' ) );
-	}
+    /**
+     * @var MessageLog
+     */
+    private $messageLog;
+    /**
+     * @var bool
+     */
+    private $hasError = false;
+    /**
+     * @var string|null
+     */
+    private $productId;
 
-	public function check_product_attributes() {
-		$error        = false;
-		$message      = '';
-		$errorMessage = '';
+    /**
+     * ProductAjax constructor.
+     */
+    public function __construct()
+    {
+        $this->messageLog = new MessageLog();
+    }
 
-		$offset = (int) sanitize_text_field( $_POST['offset'] );
+    public function register()
+    {
+        add_action('wp_ajax_product_attributes', array($this, 'check_product_attributes'));
+    }
 
-		if ( ! is_int( $offset ) ) {
-			wp_send_json_error( 'offset is not integer' );
-			exit;
-		}
+    public function check_product_attributes()
+    {
+        $offset = (int)sanitize_text_field($_POST['offset']);
 
-		$productProcesser = ProductProcessor::instance();
-		$processedMessage = $productProcesser->checkProduct($offset);
+        if (!is_int($offset)) {
+            $this->send_response();
+        }
 
-		if ( is_wp_error( $processedMessage ) ) {
-			$error        = true;
-			$errorMessage = $processedMessage->get_error_message();
-		} else {
-			$message = sprintf( __( 'Product Id %s is processed!' ), $processedMessage );
-		}
+        $this->productId = ProductProcessor::getProductId($offset);
+//        $this->productId = 3741;
 
-		wp_send_json( array(
-			'productId'    => $productProcesser->productId,
-			'message'      => $message,
-			'error'        => $error,
-			'errorMessage' => $errorMessage,
-		) );
-		die;
-	}
+        if (empty($this->productId)) {
+            $this->messageLog->add_message('Product not found.');
+            $this->send_response();
+        }
+
+        try {
+            $productProcesser = new ProductProcessor($this->productId, $this->messageLog);
+            $productProcesser->processProduct();
+            $message = sprintf(__('Product Id %s is processed!'), $this->productId);
+            $this->messageLog->add_message($message);
+        } catch (Exception $exception) {
+            $this->hasError = true;
+            $this->messageLog->add_message($exception->getMessage());
+        }
+
+        $this->send_response();
+    }
+
+    private function send_response()
+    {
+        wp_send_json(array(
+            'productId' => $this->productId,
+            'messages' => $this->messageLog->get_messages(),
+            'error' => $this->hasError,
+        ));
+        exit;
+    }
 }

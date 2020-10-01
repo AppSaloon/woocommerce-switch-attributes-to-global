@@ -1,3 +1,5 @@
+<?php /* @var $max int */ ?>
+
 <h1>Process bar</h1>
 
 <h3>Transformer script</h3>
@@ -11,10 +13,12 @@
 </div>
 <progress id="progress_bar" max="<?php echo $max; ?>" value="0" data-label=""></progress>
 
-<button id="btn_start_process" onclick="startProcess()" class="button button-primary">Start script</button>
+<button id="btn_start_process" class="button button-primary">Start script</button>
 
 <p><strong>Note:</strong> The progress will be updated by ajax calls.</p>
-<div id="message" style="width: 100%; white-space: pre; max-height: 300px; overflow-y: auto"></div>
+<div style="display: flex; max-height: 500px;">
+    <div id="message" style="width: 100%; white-space: pre; overflow-y: auto"></div>
 
-<div id="failed_products" style="width: 100%; white-space: pre; max-height: 300px; overflow-y: auto"></div>
+    <div id="failed_products" style="width: 100%; white-space: pre; overflow-y: auto"></div>
+</div>
 <?php

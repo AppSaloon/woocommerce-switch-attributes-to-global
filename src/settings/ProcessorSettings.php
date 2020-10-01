@@ -42,7 +42,7 @@ class ProcessorSettings {
 	}
 
 	public function transform_page_html() {
-		$max = ( ProductProcessor::instance() )->getTotalProducts();
+		$max = ProductProcessor::getTotalProducts();
 
 		include AP_DIR . 'templates/backend/ProgressBar.php';
 	}
