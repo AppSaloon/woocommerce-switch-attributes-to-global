@@ -12,14 +12,14 @@ Requires PHP: 7.0
 Requires at least: 5.0
 Tested up to: 5.3
 Stable tag: 1.0.0
-Version: 1.0.1-dev
+Version: 1.0.2
 */
 
 define( 'AP_DIR', __DIR__ . DIRECTORY_SEPARATOR );
 
 define( 'AP_URL', plugin_dir_url( __FILE__ ) );
 
-define( 'AP_VERSION', '1.0.1' );
+define( 'AP_VERSION', '1.0.2' );
 
 require __DIR__ . '/vendor/autoload.php';
 
