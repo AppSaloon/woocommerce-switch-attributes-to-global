@@ -24,31 +24,24 @@ function abort () {
   init()
 }
 
-function startProcess () {
+async function startProcess () {
   console.log('startprocess')
-  const action = ap_progress.action
-  const promises = []
-  for (let i = 0; i < maxProducts; i++) {
-    const promise = new Promise(function (resolve) {
-      const options = 'action=' + action + '&offset=' + i + '&max=' + maxProducts
-      checkProduct(options, abortController.signal).then(resolve)
-    })
-    promises.push(promise)
-  }
-
   elBtnProgress.innerHTML = 'IN PROGRESS (click to stop)'
   elBtnProgress.addEventListener('click', abort)
   elBtnProgress.removeEventListener('click', startProcess)
   elFailedProducts.innerHTML = ''
   elMessage.innerHTML = ''
 
-  Promise.all(promises).then(() => {
-    elProgress.value = 0
-    elAmountCompleted.innerHTML = '0'
-    elPercentageCompleted.innerHTML = '0'
-    init()
-    elMessage.innerHTML += 'The process is complete <br>'
-  }).catch((error) => {})
+  for (let i = 0; i < maxProducts; i++) {
+    const options = 'action=' + ap_progress.action + '&offset=' + i + '&max=' + maxProducts
+    await checkProduct(options, abortController.signal)
+  }
+
+  elProgress.value = 0
+  elAmountCompleted.innerHTML = '0'
+  elPercentageCompleted.innerHTML = '0'
+  elMessage.innerHTML += 'The process is complete <br>'
+  init()
 }
 
 async function checkProduct (options, abortSignal) {
