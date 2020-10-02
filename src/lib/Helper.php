@@ -1,9 +1,13 @@
 <?php
 
-namespace Appsaloon\Processor\Lib;
+namespace appsaloon\wcstga\lib;
 
 use Generator;
 
+/**
+ * Class Helper
+ * @package appsaloon\wcstga\lib
+ */
 class Helper {
 	/**
 	 * Loops array one by one

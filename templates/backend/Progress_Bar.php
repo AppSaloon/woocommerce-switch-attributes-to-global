@@ -1,6 +1,6 @@
 <?php /* @var $max int */ ?>
 
-<h1>Process bar</h1>
+<h1>Progress bar</h1>
 
 <h3>Transformer script</h3>
 <p>This script will check every product. It will turn the product attributes into global WooCommerce attributes.

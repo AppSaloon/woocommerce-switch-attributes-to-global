@@ -1,8 +1,8 @@
 {
   "autoload": {
     "psr-4": {
-      "Appsaloon\\Processor\\": "src/",
-      "appsaloon\\Processor\\Tests\\" : "tests/"
+      "appsaloon\\wcstga\\": "src/",
+      "appsaloon\\wcstga\\Tests\\" : "tests/"
     }
   }
 }

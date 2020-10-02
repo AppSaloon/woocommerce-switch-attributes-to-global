@@ -23,10 +23,10 @@ define( 'AP_VERSION', '1.0.2' );
 
 require __DIR__ . '/vendor/autoload.php';
 
-use Appsaloon\Processor\Settings\ProcessorSettings;
+use appsaloon\wcstga\settings\Processor_Settings;
 
-use Appsaloon\Processor\Ajax\ProductAjax;
+use appsaloon\wcstga\ajax\Product_Ajax;
 
-(new ProcessorSettings())->register();
+(new Processor_Settings())->register();
 
-(new ProductAjax())->register();
+(new Product_Ajax())->register();

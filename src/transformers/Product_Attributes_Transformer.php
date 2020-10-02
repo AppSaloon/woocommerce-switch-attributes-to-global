@@ -1,15 +1,15 @@
 <?php
 
-namespace Appsaloon\Processor\Transformers;
+namespace appsaloon\wcstga\transformers;
 
-use Appsaloon\Processor\Lib\MessageLog;
-use Appsaloon\Processor\Controllers\AttributeController;
-use Appsaloon\Processor\Lib\Helper;
+use appsaloon\wcstga\lib\Message_Log;
+use appsaloon\wcstga\controllers\Attribute_Controller;
+use appsaloon\wcstga\lib\Helper;
 use Exception;
 use WC_Product_Attribute;
 use WC_Product_Variable;
 
-class ProductAttributesTransformer
+class Product_Attributes_Transformer
 {
 
     /**
@@ -23,21 +23,21 @@ class ProductAttributesTransformer
     private $attributes;
 
     /**
-     * @var AttributeController
+     * @var Attribute_Controller
      */
     private $attributeController;
     /**
-     * @var MessageLog
+     * @var Message_Log
      */
     private $messageLog;
 
     /**
      * ProductAttributesTransformer constructor.
      * @param int $productId
-     * @param MessageLog $messageLog
+     * @param Message_Log $messageLog
      * @throws Exception
      */
-    public function __construct(int $productId, MessageLog $messageLog)
+    public function __construct(int $productId, Message_Log $messageLog)
     {
         $product = wc_get_product($productId);
         if(!is_a($product, WC_Product_Variable::class)) {
@@ -82,7 +82,7 @@ class ProductAttributesTransformer
          * @var $ProductAttribute WC_Product_Attribute
          */
         foreach (Helper::generator($this->attributes) as $taxonomy => $productAttribute) {
-            $attributeController = new AttributeController(
+            $attributeController = new Attribute_Controller(
                 $this->product,
                 $this->messageLog,
                 $taxonomy,

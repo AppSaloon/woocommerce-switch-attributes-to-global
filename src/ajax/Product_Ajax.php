@@ -1,20 +1,20 @@
 <?php
 
-namespace Appsaloon\Processor\Ajax;
+namespace appsaloon\wcstga\ajax;
 
-use Appsaloon\Processor\Lib\MessageLog;
-use Appsaloon\Processor\Processors\ProductProcessor;
+use appsaloon\wcstga\lib\Message_Log;
+use appsaloon\wcstga\processors\Product_Processor;
 use Exception;
 
 /**
- * Class ProductAjax
- * @package Appsaloon\Processor\Ajax
+ * Class Product_Ajax
+ * @package appsaloon\wcstga\ajax
  */
-class ProductAjax
+class Product_Ajax
 {
 
     /**
-     * @var MessageLog
+     * @var Message_Log
      */
     private $messageLog;
     /**
@@ -31,7 +31,7 @@ class ProductAjax
      */
     public function __construct()
     {
-        $this->messageLog = new MessageLog();
+        $this->messageLog = new Message_Log();
     }
 
     public function register()
@@ -47,7 +47,7 @@ class ProductAjax
             $this->send_response();
         }
 
-        $this->productId = ProductProcessor::getProductId($offset);
+        $this->productId = Product_Processor::getProductId($offset);
 //        $this->productId = 3741;
 
         if (empty($this->productId)) {
@@ -56,7 +56,7 @@ class ProductAjax
         }
 
         try {
-            $productProcesser = new ProductProcessor($this->productId, $this->messageLog);
+            $productProcesser = new Product_Processor($this->productId, $this->messageLog);
             $productProcesser->processProduct();
             $message = sprintf(__('Product Id %s is processed!'), $this->productId);
             $this->messageLog->add_message($message);

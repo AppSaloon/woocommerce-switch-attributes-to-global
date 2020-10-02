@@ -1,15 +1,19 @@
 <?php
 
-namespace Appsaloon\Processor\Controllers;
+namespace appsaloon\wcstga\controllers;
 
-use Appsaloon\Processor\Lib\MessageLog;
+use appsaloon\wcstga\lib\Message_Log;
 use Exception;
 use WC_Product_Variable;
 use WC_Product_Attribute;
 use WP_Error;
 use WP_Term;
 
-class AttributeController
+/**
+ * Class Attribute_Controller
+ * @package appsaloon\wcstga\controllers
+ */
+class Attribute_Controller
 {
 
     /**
@@ -32,7 +36,7 @@ class AttributeController
      */
     private $productAttribute;
     /**
-     * @var MessageLog
+     * @var Message_Log
      */
     private $messageLog;
 
@@ -40,13 +44,13 @@ class AttributeController
      * AttributeController constructor.
      *
      * @param WC_Product_Variable $product
-     * @param MessageLog $messageLog
+     * @param Message_Log $messageLog
      * @param string $taxonomy
      * @param WC_Product_Attribute $productAttribute
      */
     public function __construct(
         WC_Product_Variable $product,
-        MessageLog $messageLog,
+        Message_Log $messageLog,
         string $taxonomy,
         WC_Product_Attribute $productAttribute
     )

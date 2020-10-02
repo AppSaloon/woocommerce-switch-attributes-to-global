@@ -1,16 +1,16 @@
 <?php
 
-namespace Appsaloon\Processor\Processors;
+namespace appsaloon\wcstga\processors;
 
-use Appsaloon\Processor\Lib\MessageLog;
-use Appsaloon\Processor\Transformers\ProductAttributesTransformer;
+use appsaloon\wcstga\lib\Message_Log;
+use appsaloon\wcstga\transformers\Product_Attributes_Transformer;
 use Exception;
 
 /**
- * Class ProductProcessor
- * @package Appsaloon\Processor\Processors
+ * Class Product_Processor
+ * @package appsaloon\wcstga\processors
  */
-class ProductProcessor
+class Product_Processor
 {
 
     /**
@@ -18,16 +18,16 @@ class ProductProcessor
      */
     public $productId;
     /**
-     * @var MessageLog
+     * @var Message_Log
      */
     private $messageLog;
 
     /**
      * ProductProcessor constructor.
      * @param int $productId
-     * @param MessageLog $messageLog
+     * @param Message_Log $messageLog
      */
-    public function __construct(int $productId, MessageLog $messageLog)
+    public function __construct(int $productId, Message_Log $messageLog)
     {
         $this->productId = $productId;
         $this->messageLog = $messageLog;
@@ -38,7 +38,7 @@ class ProductProcessor
      */
     public function processProduct()
     {
-        $productTransformer = new ProductAttributesTransformer($this->productId, $this->messageLog);
+        $productTransformer = new Product_Attributes_Transformer($this->productId, $this->messageLog);
 
         if ($productTransformer->hasInvalidAttributes()) {
             $productTransformer->transformAttributes();

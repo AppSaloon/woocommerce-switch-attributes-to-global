@@ -1,10 +1,14 @@
 <?php
 
-namespace Appsaloon\Processor\Settings;
+namespace appsaloon\wcstga\settings;
 
-use Appsaloon\Processor\Processors\ProductProcessor;
+use appsaloon\wcstga\processors\Product_Processor;
 
-class ProcessorSettings {
+/**
+ * Class Processor_Settings
+ * @package appsaloon\wcstga\settings
+ */
+class Processor_Settings {
 
 	public function register() {
 		add_action( 'admin_menu', function () {
@@ -42,9 +46,9 @@ class ProcessorSettings {
 	}
 
 	public function transform_page_html() {
-		$max = ProductProcessor::getTotalProducts();
+		$max = Product_Processor::getTotalProducts();
 
-		include AP_DIR . 'templates/backend/ProgressBar.php';
+		include AP_DIR . 'templates/backend/Progress_Bar.php';
 	}
 
 

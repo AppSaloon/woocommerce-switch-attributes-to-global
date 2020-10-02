@@ -1,12 +1,12 @@
 <?php
 
-namespace Appsaloon\Processor\Lib;
+namespace appsaloon\wcstga\lib;
 
 /**
- * Class MessageLog
- * @package Appsaloon\Helper
+ * Class Message_Log
+ * @package appsaloon\wcstga\lib
  */
-class MessageLog
+class Message_Log
 {
     /**
      * @var array
