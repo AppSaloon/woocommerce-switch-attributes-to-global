@@ -9,3 +9,6 @@ This plugin converts product attributes from product to global level
 
 ## Problems
 Please create an [issue](https://github.com/AppSaloon/woocommerce-switch-attributes-to-global/issues/new/choose) and we will take a look at your problem.
+
+## Made by
+[AppSaloon](https://appsaloon.be/blog/woocommerce-converting-product-attributes-from-product-to-global-level/)
