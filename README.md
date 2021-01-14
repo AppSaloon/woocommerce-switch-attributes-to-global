@@ -1,9 +1,6 @@
-#Product attribute transformer
+# Product attribute transformer
 
-This plugin transforms products attributes to global woocommerce attributes.
-
-## Menu
-The script dashboard is under the Tools menu on the backend.
+This plugin converts product attributes from product to global level
 
 ## Installation
 1. Install the plugin via FTP or ZIP
